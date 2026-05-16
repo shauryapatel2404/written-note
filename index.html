@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cloud Notes App</title>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 700px;
+      background: white;
+      border-radius: 20px;
+      padding: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+      color: #333;
+      font-size: 40px;
+    }
+
+    .auth-box {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    input {
+      flex: 1;
+      padding: 12px;
+      border-radius: 10px;
+      border: 2px solid #ddd;
+      font-size: 16px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 200px;
+      padding: 15px;
+      border-radius: 15px;
+      border: 2px solid #ddd;
+      font-size: 18px;
+      resize: none;
+      margin-bottom: 15px;
+    }
+
+    button {
+      padding: 12px 20px;
+      border: none;
+      border-radius: 10px;
+      background: #667eea;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      transition: 0.3s;
+    }
+
+    button:hover {
+      background: #5a67d8;
+    }
+
+    .top-buttons {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      flex-wrap: wrap;
+    }
+
+    .status {
+      margin-top: 10px;
+      color: green;
+      font-weight: bold;
+      text-align: center;
+    }
+
+    .user-email {
+      text-align: center;
+      margin-bottom: 15px;
+      color: #444;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h1>My Notes</h1>
+
+    <div class="auth-box">
+      <input type="email" id="email" placeholder="Enter Email">
+      <input type="password" id="password" placeholder="Enter Password">
+    </div>
+
+    <div class="top-buttons">
+      <button onclick="signup()">Sign Up</button>
+      <button onclick="login()">Login</button>
+      <button onclick="logout()">Logout</button>
+    </div>
+
+    <div class="user-email" id="userEmail"></div>
+
+    <textarea id="notes" placeholder="Write your notes here..."></textarea>
+
+    <div class="top-buttons">
+      <button onclick="saveNotes()">Save Notes</button>
+      <button onclick="loadNotes()">Load Notes</button>
+    </div>
+
+    <div class="status" id="status"></div>
+  </div>
+
+  <!-- Firebase -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import {
+      getAuth,
+      createUserWithEmailAndPassword,
+      signInWithEmailAndPassword,
+      signOut,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+
+    import {
+      getFirestore,
+      doc,
+      setDoc,
+      getDoc
+    } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    // =============================
+    // PASTE YOUR FIREBASE DETAILS
+    // =============================
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_PROJECT.firebaseapp.com",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_PROJECT.appspot.com",
+      messagingSenderId: "YOUR_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    const emailInput = document.getElementById("email");
+    const passwordInput = document.getElementById("password");
+    const notesInput = document.getElementById("notes");
+    const status = document.getElementById("status");
+    const userEmail = document.getElementById("userEmail");
+
+    window.signup = async function () {
+      try {
+        await createUserWithEmailAndPassword(
+          auth,
+          emailInput.value,
+          passwordInput.value
+        );
+
+        status.innerText = "Account Created Successfully";
+      } catch (error) {
+        status.innerText = error.message;
+      }
+    };
+
+    window.login = async function () {
+      try {
+        await signInWithEmailAndPassword(
+          auth,
+          emailInput.value,
+          passwordInput.value
+        );
+
+        status.innerText = "Login Successful";
+      } catch (error) {
+        status.innerText = error.message;
+      }
+    };
+
+    window.logout = async function () {
+      await signOut(auth);
+      notesInput.value = "";
+      userEmail.innerText = "";
+      status.innerText = "Logged Out";
+    };
+
+    window.saveNotes = async function () {
+      const user = auth.currentUser;
+
+      if (!user) {
+        status.innerText = "Please login first";
+        return;
+      }
+
+      await setDoc(doc(db, "notes", user.uid), {
+        text: notesInput.value
+      });
+
+      status.innerText = "Notes Saved To Cloud";
+    };
+
+    window.loadNotes = async function () {
+      const user = auth.currentUser;
+
+      if (!user) {
+        status.innerText = "Please login first";
+        return;
+      }
+
+      const docRef = doc(db, "notes", user.uid);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        notesInput.value = docSnap.data().text;
+        status.innerText = "Notes Loaded";
+      } else {
+        status.innerText = "No notes found";
+      }
+    };
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        userEmail.innerText = `Logged in as: ${user.email}`;
+        loadNotes();
+      } else {
+        userEmail.innerText = "";
+      }
+    });
+  </script>
+
+</body>
+</html>
